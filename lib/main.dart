@@ -1,16 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:abwarehouse/scanner.dart';
 
-void main() => runApp(const MyApp());
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
+import 'package:abwarehouse/scanner.dart';
+import 'package:abwarehouse/registry.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
-  Widget build(BuildContext context) => const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: HomePage(),
-      );
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: HomePage(),
+    );
+  }
 }
 
 class HomePage extends StatelessWidget {
@@ -52,7 +67,11 @@ class HomePage extends StatelessWidget {
                 Icons.assignment_outlined,
                 const Color(0xff174A93),
                 const Color(0xff081D3B),
-                () {},
+                () {Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RegistryPage()),
+                );
+              },
               ),
             ),
           ],

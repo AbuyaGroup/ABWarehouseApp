@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "312050924651",
+    "project_id": "abwarehouse-4f8fa",
+    "storage_bucket": "abwarehouse-4f8fa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:312050924651:android:9eb7d9f1583a566c7c852e",
+        "android_client_info": {
+          "package_name": "com.example.warehouse_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1O5YzPcnhvzSE4NrGsM4oP66yd5cW-ns"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:312050924651:android:0f0fcc887db0bdfe7c852e",
+        "android_client_info": {
+          "package_name": "com.nurkhalif.abwarehouse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1O5YzPcnhvzSE4NrGsM4oP66yd5cW-ns"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
