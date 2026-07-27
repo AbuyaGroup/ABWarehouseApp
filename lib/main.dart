@@ -4,14 +4,25 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-import 'package:abwarehouse/scanner.dart';
-import 'package:abwarehouse/registry.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-Future<void> main() async {
+import 'package:abwarehouse/scanner.dart';
+import 'package:abwarehouse/stock_opname.dart';
+import 'package:abwarehouse/login_dc.dart';
+
+// GANTI dengan Project URL & anon key Supabase lo
+// (yang sama persis dipake di web opname-afc)
+const supabaseUrl = 'https://qoonjeimsrzztlfyembp.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvb25qZWltc3J6enRsZnllbWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNTg2MTgsImV4cCI6MjA5OTczNDYxOH0.vgqaUJbDOu0hN7gp3f9SozHsDymZR-0TKTijl8q_2ZI';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   runApp(const MyApp());
@@ -20,12 +31,10 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: HomePage(),
-    );
-  }
+  Widget build(BuildContext context) => const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: HomePage(),
+      );
 }
 
 class HomePage extends StatelessWidget {
@@ -56,7 +65,15 @@ class HomePage extends StatelessWidget {
                 Icons.inventory_2_outlined,
                 const Color(0xff174A93),
                 const Color(0xff081D3B),
-                () {},
+                () {
+                  final loggedIn = Supabase.instance.client.auth.currentSession != null;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => loggedIn ? const StockOpname() : const LoginDcPage(),
+                    ),
+                  );
+                },
               ),
             ),
             StaggeredGridTile.count(
@@ -67,11 +84,7 @@ class HomePage extends StatelessWidget {
                 Icons.assignment_outlined,
                 const Color(0xff174A93),
                 const Color(0xff081D3B),
-                () {Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegistryPage()),
-                );
-              },
+                () {},
               ),
             ),
           ],
@@ -107,9 +120,7 @@ class HomePage extends StatelessWidget {
               color: Colors.white,
               size: 42,
             ),
-
             const Spacer(),
-
             const Text(
               "Scanner",
               style: TextStyle(

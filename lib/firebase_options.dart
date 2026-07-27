@@ -23,20 +23,11 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -64,5 +55,32 @@ class DefaultFirebaseOptions {
     authDomain: 'abwarehouse-4f8fa.firebaseapp.com',
     storageBucket: 'abwarehouse-4f8fa.firebasestorage.app',
     measurementId: 'G-4E27PQ1VJ3',
+  );
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyDf24kADmFzZ7cwd84I2fn0DwaJBpXqQ8U',
+    appId: '1:312050924651:ios:1a204359f900fa5a7c852e',
+    messagingSenderId: '312050924651',
+    projectId: 'abwarehouse-4f8fa',
+    storageBucket: 'abwarehouse-4f8fa.firebasestorage.app',
+    iosBundleId: 'com.example.warehouseApp',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDf24kADmFzZ7cwd84I2fn0DwaJBpXqQ8U',
+    appId: '1:312050924651:ios:cbf85fc0bb295f097c852e',
+    messagingSenderId: '312050924651',
+    projectId: 'abwarehouse-4f8fa',
+    storageBucket: 'abwarehouse-4f8fa.firebasestorage.app',
+    iosBundleId: 'com.nurkhalif.abwarehouse',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyDg28Q1d1lNi94agdqmxN9PgjaC3gsipe0',
+    appId: '1:312050924651:web:2f0baa19886135487c852e',
+    messagingSenderId: '312050924651',
+    projectId: 'abwarehouse-4f8fa',
+    authDomain: 'abwarehouse-4f8fa.firebaseapp.com',
+    storageBucket: 'abwarehouse-4f8fa.firebasestorage.app',
+    measurementId: 'G-70KN2GRZGE',
   );
 }
