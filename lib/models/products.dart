@@ -1,19 +1,28 @@
 class Product {
   final String barcode;
-  final String productName;
-  final String unit;
+  final String nama;
+  final String? kodeProduk;
+  final String? kategori;
+  final String? subkategori;
+  final String? satuan;
 
   Product({
     required this.barcode,
-    required this.productName,
-    required this.unit,
+    required this.nama,
+    this.kodeProduk,
+    this.kategori,
+    this.subkategori,
+    this.satuan,
   });
 
-  factory Product.fromFirestore(String id, Map<String, dynamic> data) {
+  factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
-      barcode: id,
-      productName: data['product_name'] ?? '',
-      unit: data['unit'] ?? '',
+      barcode: json['barcode'] as String,
+      nama: json['nama'] as String,
+      kodeProduk: json['kode_produk'] as String?,
+      kategori: json['kategori'] as String?,
+      subkategori: json['sub_kategori'] as String?,
+      satuan: json['satuan'] as String?,
     );
   }
 }

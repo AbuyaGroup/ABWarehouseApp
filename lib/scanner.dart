@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:abwarehouse/models/products.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Scanner extends StatefulWidget {
   const Scanner({super.key});
@@ -17,6 +18,8 @@ class _ScannerState extends State<Scanner> {
 
   final Map<String, Product> products = {};
   final Map<String, int> qty = {};
+
+  final supabase = Supabase.instance.client;
 
   bool canScan = true;
   bool isLoadingProducts = true;
@@ -33,25 +36,62 @@ class _ScannerState extends State<Scanner> {
   try {
     products.clear();
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection("products")
-        .get();
+    final response = await supabase
+        .from('master_produk')
+        .select(
+          'barcode, kode_produk, nama, kategori, sub_kategori, satuan',
+        );
 
-    for (var doc in snapshot.docs) {
-      products[doc.id] = Product.fromFirestore(
-        doc.id,
-        doc.data(),
-      );
+    for (final row in response) {
+      final product = Product.fromJson(row);
+      products[product.barcode] = product;
     }
 
-    print("Loaded ${products.length} products");
+    debugPrint("Loaded ${products.length} products");
   } catch (e) {
-    print("Firestore error: $e");
+    debugPrint("Supabase error: $e");
   } finally {
     if (mounted) {
       setState(() => isLoadingProducts = false);
     }
   }
+}
+
+void showProductsDialog() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text("Master Produk (${products.length})"),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 400,
+        child: ListView.builder(
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            final product = products.values.elementAt(index);
+
+            return ListTile(
+              dense: true,
+              title: Text(product.nama),
+              subtitle: Text(
+                "Barcode: ${product.barcode}\n"
+                "Kode: ${product.kodeProduk}\n"
+                "Kategori: ${product.kategori}\n"
+                "Subkategori: ${product.subkategori}\n"
+                "Satuan: ${product.satuan}",
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("OK"),
+        ),
+      ],
+    ),
+  );
 }
 
   Future<void> scanBarcode(String code) async {
@@ -85,46 +125,6 @@ class _ScannerState extends State<Scanner> {
     });
   }
 
-  Future<void> showRegisterDialog() async {
-    final barcodeController = TextEditingController();
-    final nameController = TextEditingController();
-    final unitController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Register Product"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: barcodeController, decoration: const InputDecoration(labelText: "Barcode")),
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: "Product Name")),
-            TextField(controller: unitController, decoration: const InputDecoration(labelText: "Unit")),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: ()=>Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection("products")
-                  .doc(barcodeController.text.trim())
-                  .set({
-                "product_name": nameController.text.trim(),
-                "unit": unitController.text.trim(),
-              });
-
-              await loadProducts();
-
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          )
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (isLoadingProducts) {
@@ -140,8 +140,8 @@ class _ScannerState extends State<Scanner> {
             onPressed: loadProducts,
           ),
           IconButton(
-            icon: const Icon(Icons.add_box_outlined),
-            onPressed: showRegisterDialog,
+            icon: const Icon(Icons.list),
+            onPressed: showProductsDialog,
           ),
         ],
       ),
@@ -173,8 +173,18 @@ class _ScannerState extends State<Scanner> {
 
                 return Card(
                   child: ListTile(
-                    title: Text(product?.productName ?? "Unknown"),
-                    subtitle: Text("$barcode\n${product?.unit ?? ""}"),
+                    title: Text(product?.nama ?? "Unknown"),
+
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Barcode : ${product?.barcode ?? ""}"),
+                        Text("Kode : ${product?.kodeProduk ?? ""}"),
+                        Text("Kategori : ${product?.kategori ?? ""}"),
+                        Text("Subkategori : ${product?.subkategori ?? ""}"),
+                        Text("Satuan : ${product?.satuan ?? ""}"),
+                      ],
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
