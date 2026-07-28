@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Halaman history: nampilin sesi-sesi Stock Opname yang pernah/lagi
+/// jalan per DC, dan detail item yang udah discan di tiap sesi.
 class StockOpname extends StatefulWidget {
   const StockOpname({super.key});
 
@@ -12,19 +12,12 @@ class StockOpname extends StatefulWidget {
 
 class _StockOpnameState extends State<StockOpname> {
   final supabase = Supabase.instance.client;
-  final AudioPlayer player = AudioPlayer();
-  final MobileScannerController controller = MobileScannerController();
 
-  bool canScan = true;
   bool isLoading = true;
-  String? namaUser;
-  String? role; // 'admin' atau 'user'
-
+  String? role;
   List<Map<String, dynamic>> dcList = [];
   String? selectedDcId;
-  String? selectedZona;
-  Map<String, dynamic>? activeSession;
-  final Map<String, Map<String, dynamic>> scannedItems = {};
+  List<Map<String, dynamic>> sessionList = [];
 
   @override
   void initState() {
@@ -36,16 +29,16 @@ class _StockOpnameState extends State<StockOpname> {
     setState(() => isLoading = true);
     await loadProfile();
     await loadDcs();
-    if (selectedDcId != null) await loadActiveSession();
-    setState(() => isLoading = false);
+    if (selectedDcId != null) await loadSessions();
+    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> loadProfile() async {
     final uid = supabase.auth.currentUser?.id;
     if (uid == null) return;
-    final data = await supabase.from('profiles').select().eq('id', uid).maybeSingle();
-    namaUser = data?['nama'] ?? supabase.auth.currentUser?.email ?? 'User';
-    role = data?['role'] ?? 'user';
+    final data =
+        await supabase.from('profiles').select().eq('id', uid).maybeSingle();
+    role = data?['role'] ?? 'scanner';
     if (role != 'admin') {
       selectedDcId = data?['dc_id'];
     }
@@ -56,166 +49,29 @@ class _StockOpnameState extends State<StockOpname> {
     dcList = List<Map<String, dynamic>>.from(data);
   }
 
-  Future<void> loadActiveSession() async {
+  /// Semua sesi (apapun statusnya -- aktif, selesai, dll) buat history.
+  Future<void> loadSessions() async {
     if (selectedDcId == null) return;
     try {
       final data = await supabase
           .from('opname_sessions')
           .select()
           .eq('dc_id', selectedDcId!)
-          .eq('status', 'aktif')
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      activeSession = data;
+          .order('created_at', ascending: false);
+      sessionList = List<Map<String, dynamic>>.from(data);
     } catch (e) {
-      debugPrint("Gagal load sesi aktif: $e");
+      debugPrint("Gagal load history sesi: $e");
+      sessionList = [];
     }
-    scannedItems.clear();
   }
 
   Future<void> pilihDc(String dcId) async {
-    setState(() { selectedDcId = dcId; selectedZona = null; isLoading = true; });
-    await loadActiveSession();
-    setState(() => isLoading = false);
-  }
-
-  void pilihZona(String zona) {
     setState(() {
-      selectedZona = zona;
-      scannedItems.clear();
+      selectedDcId = dcId;
+      isLoading = true;
     });
-  }
-
-  static const List<String> zonaOptions = [
-    'A','B','C','D','E','F','G','H','I','J','K','L','M',
-    'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-  ];
-
-  Future<void> scanBarcode(String code) async {
-    if (selectedDcId == null || activeSession == null || selectedZona == null) return;
-
-    try {
-      final item = await supabase
-          .from('produk')
-          .select('id, nama, satuan, barcode, zona, sector')
-          .eq('dc_id', selectedDcId!)
-          .eq('barcode', code)
-          .maybeSingle();
-
-      if (item == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Barcode $code belum terdaftar di DC ini")),
-          );
-        }
-        return;
-      }
-
-      final produkId = item['id'] as String;
-      final sessionId = activeSession!['id'] as String;
-
-      final existingEntry = await supabase
-          .from('opname_entries')
-          .select()
-          .eq('session_id', sessionId)
-          .eq('produk_id', produkId)
-          .maybeSingle();
-
-      await player.play(AssetSource("beep.mp3"));
-
-      if (!mounted) return;
-      final hasil = await showQtyDialog(
-        namaItem: item['nama'] ?? 'Unknown',
-        satuan: item['satuan'] ?? '',
-        qtyAwal: existingEntry?['qty_fisik'],
-        sectorAwal: item['sector'],
-      );
-
-      if (hasil == null) return; // dibatalin
-
-      final entryPayload = {
-        'session_id': sessionId,
-        'produk_id': produkId,
-        'qty_fisik': hasil['qty'],
-        'catatan': existingEntry?['catatan'],
-        'updated_by': namaUser,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      await supabase.from('opname_entries').upsert(
-        entryPayload, onConflict: 'session_id,produk_id',
-      );
-
-      // Zona dari pilihan di awal (level app), Sector dari popup barusan.
-      // Disimpen permanen di tabel produk, biar web otomatis kegroup.
-      final produkUpdate = <String, dynamic>{'zona': selectedZona};
-      if (hasil['sector'] != null) produkUpdate['sector'] = hasil['sector'];
-      await supabase.from('produk').update(produkUpdate).eq('id', produkId);
-      final itemTampil = {...item, ...produkUpdate};
-
-      setState(() {
-        scannedItems[produkId] = {'item': itemTampil, 'entry': entryPayload};
-      });
-    } catch (e) {
-      debugPrint("Gagal proses scan: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal sync ke server: $e")),
-        );
-      }
-    }
-  }
-
-  Future<Map<String, dynamic>?> showQtyDialog({
-    required String namaItem,
-    required String satuan,
-    num? qtyAwal,
-    String? sectorAwal,
-  }) {
-    final qtyCtrl = TextEditingController(text: qtyAwal != null ? qtyAwal.toString() : '');
-    final sectorCtrl = TextEditingController(text: sectorAwal ?? '');
-
-    return showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(namaItem),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: InputDecoration(labelText: "Qty Fisik", suffixText: satuan),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: sectorCtrl,
-              decoration: const InputDecoration(labelText: "Sector"),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
-          ElevatedButton(
-            onPressed: () {
-              final val = num.tryParse(qtyCtrl.text.trim());
-              Navigator.pop(context, {
-                'qty': val ?? 0,
-                'sector': sectorCtrl.text.trim().isEmpty ? null : sectorCtrl.text.trim(),
-              });
-            },
-            child: const Text("Simpan"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> logout() async {
-    await supabase.auth.signOut();
-    if (mounted) Navigator.popUntil(context, (route) => route.isFirst);
+    await loadSessions();
+    if (mounted) setState(() => isLoading = false);
   }
 
   @override
@@ -227,20 +83,19 @@ class _StockOpnameState extends State<StockOpname> {
     // Admin belum pilih DC -> tampilin pilihan DC dulu
     if (role == 'admin' && selectedDcId == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text("Pilih DC"),
-          actions: [IconButton(icon: const Icon(Icons.logout), onPressed: logout)],
-        ),
+        appBar: AppBar(title: const Text("Pilih DC")),
         body: ListView(
           padding: const EdgeInsets.all(16),
-          children: dcList.map((dc) => Card(
-            child: ListTile(
-              title: Text(dc['nama'] ?? ''),
-              subtitle: Text(dc['sub'] ?? ''),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => pilihDc(dc['id']),
-            ),
-          )).toList(),
+          children: dcList
+              .map((dc) => Card(
+                    child: ListTile(
+                      title: Text(dc['nama'] ?? ''),
+                      subtitle: Text(dc['sub'] ?? ''),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () => pilihDc(dc['id']),
+                    ),
+                  ))
+              .toList(),
         ),
       );
     }
@@ -250,130 +105,197 @@ class _StockOpnameState extends State<StockOpname> {
       orElse: () => {'nama': selectedDcId},
     )['nama'];
 
-    // DC udah dipilih tapi Zona belum -> tampilin pilihan Zona dulu
-    if (selectedZona == null) {
-      return PopScope(
-        canPop: role != 'admin',
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
-          if (role == 'admin') setState(() => selectedDcId = null);
-        },
-        child: Scaffold(
+    return PopScope(
+      canPop: role != 'admin',
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (role == 'admin') setState(() => selectedDcId = null);
+      },
+      child: Scaffold(
         appBar: AppBar(
-          title: Text("$dcNama · Pilih Zona"),
+          title: Text("$dcNama · History Opname"),
           leading: role == 'admin'
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => setState(() => selectedDcId = null),
+                  onPressed: () => setState(() {
+                    selectedDcId = null;
+                    sessionList.clear();
+                  }),
                 )
               : null,
-          actions: [IconButton(icon: const Icon(Icons.logout), onPressed: logout)],
-        ),
-        body: GridView.count(
-          padding: const EdgeInsets.all(16),
-          crossAxisCount: 4,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          children: zonaOptions.map((z) => InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => pilihZona(z),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xffF4F6FA),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xffDDE3EC)),
-              ),
-              alignment: Alignment.center,
-              child: Text(z, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xff174A93))),
-            ),
-          )).toList(),
-        ),
-        ),
-      );
-    }
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        setState(() => selectedZona = null);
-      },
-      child: Scaffold(
-      appBar: AppBar(
-        title: Text("$dcNama · Zona $selectedZona · ${namaUser ?? 'User'}"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => setState(() => selectedZona = null),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.grid_view),
-            tooltip: 'Ganti Zona',
-            onPressed: () => setState(() => selectedZona = null),
-          ),
-          if (role == 'admin')
+          actions: [
             IconButton(
-              icon: const Icon(Icons.swap_horiz),
-              tooltip: 'Ganti DC',
-              onPressed: () => setState(() { selectedDcId = null; selectedZona = null; }),
+              icon: const Icon(Icons.refresh),
+              onPressed: () async {
+                setState(() => isLoading = true);
+                await loadSessions();
+                if (mounted) setState(() => isLoading = false);
+              },
             ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: () async {
-            setState(() => isLoading = true);
-            await loadActiveSession();
-            setState(() => isLoading = false);
-          }),
-          IconButton(icon: const Icon(Icons.logout), onPressed: logout),
-        ],
-      ),
-      body: activeSession == null
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  "Belum ada sesi opname aktif buat DC ini.\nBuka web opname & bikin sesi dulu, terus tekan refresh di sini.",
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: MobileScanner(
-                    controller: controller,
-                    onDetect: (capture) async {
-                      if (!canScan) return;
-                      final code = capture.barcodes.first.rawValue;
-                      if (code == null) return;
-                      canScan = false;
-                      await scanBarcode(code);
-                      await Future.delayed(const Duration(milliseconds: 700));
-                      canScan = true;
-                    },
+          ],
+        ),
+        body: sessionList.isEmpty
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    "Belum ada riwayat sesi opname buat DC ini.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
-                Expanded(
-                  flex: 5,
-                  child: scannedItems.isEmpty
-                      ? const Center(child: Text("Belum ada item di-scan"))
-                      : ListView(
-                          children: scannedItems.entries.map((e) {
-                            final item = e.value['item'] as Map<String, dynamic>;
-                            final entry = e.value['entry'] as Map<String, dynamic>;
-                            final qtyFisik = entry['qty_fisik'] ?? 0;
-                            return Card(
-                              child: ListTile(
-                                title: Text(item['nama'] ?? "Unknown"),
-                                subtitle: Text(item['satuan'] ?? ""),
-                                trailing: Text("$qtyFisik", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              ),
-                            );
-                          }).toList(),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: sessionList.length,
+                itemBuilder: (context, index) {
+                  final sesi = sessionList[index];
+                  final namaSesi = sesi['nama'] ?? 'Sesi Opname';
+                  final status = (sesi['status'] ?? '-').toString();
+                  final tglRaw = (sesi['tanggal'] ?? sesi['created_at'])?.toString() ?? '';
+                  final tgl = tglRaw.length >= 10 ? tglRaw.substring(0, 10) : tglRaw;
+                  final isAktif = status == 'aktif';
+
+                  return Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            isAktif ? const Color(0xff2E7D32) : const Color(0xff174A93),
+                        child: const Icon(Icons.fact_check_outlined, color: Colors.white),
+                      ),
+                      title: Text(namaSesi,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      subtitle: Text("Tanggal: $tgl · Status: $status"),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SessionDetailPage(
+                            sessionId: sesi['id'] as String,
+                            sessionName: namaSesi,
+                          ),
                         ),
-                )
-              ],
-            ),
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
+    );
+  }
+}
+
+/// Detail item-item yang udah discan dalam satu sesi opname.
+class SessionDetailPage extends StatefulWidget {
+  final String sessionId;
+  final String sessionName;
+
+  const SessionDetailPage({
+    super.key,
+    required this.sessionId,
+    required this.sessionName,
+  });
+
+  @override
+  State<SessionDetailPage> createState() => _SessionDetailPageState();
+}
+
+class _SessionDetailPageState extends State<SessionDetailPage> {
+  final supabase = Supabase.instance.client;
+  bool isLoading = true;
+  List<Map<String, dynamic>> items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => loadEntries());
+  }
+
+  Future<void> loadEntries() async {
+    setState(() => isLoading = true);
+    try {
+      final entries = await supabase
+          .from('opname_entries')
+          .select()
+          .eq('session_id', widget.sessionId)
+          .order('updated_at', ascending: false);
+
+      final entryList = List<Map<String, dynamic>>.from(entries);
+      final produkIds = entryList
+          .map((e) => e['produk_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      final produkMap = <String, Map<String, dynamic>>{};
+      if (produkIds.isNotEmpty) {
+        // NB: kalau versi supabase_flutter lo lebih lama, method filter "IN"
+        // namanya .in_('id', produkIds) bukan .inFilter(...).
+        final produkData = await supabase
+            .from('produk')
+            .select('id, nama, satuan, barcode, zona, sector')
+            .inFilter('id', produkIds);
+        for (final p in List<Map<String, dynamic>>.from(produkData)) {
+          produkMap[p['id'] as String] = p;
+        }
+      }
+
+      items = entryList.map((e) {
+        final produk = produkMap[e['produk_id']] ?? <String, dynamic>{};
+        return {...e, 'produk': produk};
+      }).toList();
+    } catch (e) {
+      debugPrint("Gagal load detail sesi: $e");
+      items = [];
+    }
+    if (mounted) setState(() => isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.sessionName),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: loadEntries),
+        ],
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : items.isEmpty
+              ? const Center(child: Text("Belum ada item discan di sesi ini"))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final e = items[index];
+                    final produk = e['produk'] as Map<String, dynamic>;
+                    final qty = e['qty_fisik'] ?? 0;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        title: Text(produk['nama'] ?? 'Unknown'),
+                        subtitle: Text(
+                          "Barcode: ${produk['barcode'] ?? '-'} · "
+                          "Zona ${produk['zona'] ?? '-'} / Sector ${produk['sector'] ?? '-'}\n"
+                          "Update oleh: ${e['updated_by'] ?? '-'}",
+                        ),
+                        isThreeLine: true,
+                        trailing: Text(
+                          "$qty ${produk['satuan'] ?? ''}",
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:abwarehouse/stock_opname.dart';
 
 class LoginDcPage extends StatefulWidget {
   const LoginDcPage({super.key});
@@ -23,11 +22,8 @@ class _LoginDcPageState extends State<LoginDcPage> {
         email: emailCtrl.text.trim(),
         password: passCtrl.text,
       );
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const StockOpname()),
-      );
+      // Gak perlu navigasi manual -- AuthGate otomatis switch ke HomePage
+      // begitu status login berubah (didengerin via onAuthStateChange).
     } on AuthException catch (e) {
       setState(() => error = e.message);
     } catch (e) {
