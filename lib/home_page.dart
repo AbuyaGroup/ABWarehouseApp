@@ -3,7 +3,6 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:abwarehouse/scanner.dart';
-import 'package:abwarehouse/stock_opname.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -27,31 +26,6 @@ class HomePage extends StatelessWidget {
                   crossAxisCellCount: 2,
                   mainAxisCellCount: 1.2,
                   child: _scannerCard(context),
-                ),
-                StaggeredGridTile.count(
-                  crossAxisCellCount: 1,
-                  mainAxisCellCount: 1,
-                  child: _smallCard(
-                    "Stock\nOpname",
-                    Icons.inventory_2_outlined,
-                    const Color(0xff174A93),
-                    const Color(0xff081D3B),
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const StockOpname()),
-                    ),
-                  ),
-                ),
-                StaggeredGridTile.count(
-                  crossAxisCellCount: 1,
-                  mainAxisCellCount: 1,
-                  child: _smallCard(
-                    "Registry",
-                    Icons.assignment_outlined,
-                    const Color(0xff174A93),
-                    const Color(0xff081D3B),
-                    () {},
-                  ),
                 ),
               ],
             ),
@@ -147,30 +121,4 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
-
-  Widget _smallCard(String title, IconData icon, Color c1, Color c2,
-          VoidCallback onTap) =>
-      InkWell(
-        borderRadius: BorderRadius.circular(28),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(colors: [c1, c2]),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: Colors.white, size: 36),
-              const Spacer(),
-              Text(title,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold))
-            ],
-          ),
-        ),
-      );
 }

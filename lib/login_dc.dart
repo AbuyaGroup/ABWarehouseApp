@@ -13,6 +13,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
   bool loading = false;
+  bool obscurePassword = true;
   String? error;
 
   Future<void> doLogin() async {
@@ -43,7 +44,10 @@ class _LoginDcPageState extends State<LoginDcPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.inventory_2_outlined, size: 56, color: Color(0xff174A93)),
+            Image.asset(
+              'assets/images/logo_ABI.png',
+              height: 220,
+            ),
             const SizedBox(height: 24),
             if (error != null)
               Container(
@@ -63,8 +67,18 @@ class _LoginDcPageState extends State<LoginDcPage> {
             const SizedBox(height: 12),
             TextField(
               controller: passCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Password", border: OutlineInputBorder()),
+              obscureText: obscurePassword,
+              decoration: InputDecoration(
+                labelText: "Password",
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: const Color(0xff174A93),
+                  ),
+                  onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                ),
+              ),
               onSubmitted: (_) => loading ? null : doLogin(),
             ),
             const SizedBox(height: 20),

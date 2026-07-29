@@ -1,4 +1,4 @@
-package com.nurkhalif.abwarehouse
+package com.abuya.abwarehouse
 
 import io.flutter.embedding.android.FlutterActivity
 

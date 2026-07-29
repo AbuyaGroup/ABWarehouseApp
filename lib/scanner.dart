@@ -5,9 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Fitur utama: scan produk fisik per DC.
 /// Alur: pilih DC (admin) -> pilih sesi opname aktif -> scan -> upload.
-/// Hasil scan cuma numpuk di device dulu (barcode + qty), baru beneran
-/// kekirim ke opname_entries pas tombol Upload dipencet. Zona/sector
-/// produk ditentuin belakangan (bukan bagian dari alur scan ini lagi).
+/// Tiap scan munculin dialog pilih SECTOR (produk bisa ada di lebih dari
+/// satu sector) + isi qty. Hasil scan numpuk di device dulu (barcode +
+/// sector + qty), baru beneran kekirim ke opname_entries pas tombol
+/// Upload dipencet.
 class Scanner extends StatefulWidget {
   const Scanner({super.key});
 
@@ -34,7 +35,12 @@ class _ScannerState extends State<Scanner> {
   Map<String, dynamic>? selectedSession;
 
   // Hasil scan yang masih di device, belum di-upload ke opname_entries.
-  // Key = barcode, value = {'product': {...master_produk...}, 'qty': int}
+  // Key = "barcode|sectorId" (satu produk bisa kehitung di lebih dari satu
+  // sector dalam batch yang sama). Value = {
+  //   'barcode', 'product' (dari master_produk), 'sectorOptions' (cache
+  //   semua sector yang valid buat barcode ini, biar gak query ulang),
+  //   'sectorId', 'sectorLabel', 'qty'
+  // }
   final Map<String, Map<String, dynamic>> scannedItems = {};
 
   @override
@@ -102,18 +108,30 @@ class _ScannerState extends State<Scanner> {
     });
   }
 
-  /// Scan barcode -> cari di master_produk (atau pake yang udah ada di
-  /// batch ini) -> munculin dialog buat isi/edit qty.
+  /// Cari data barcode+sector yang UDAH pernah discan di batch ini (di
+  /// sector manapun), buat cache produk/sectorOptions & preselect dialog.
+  MapEntry<String, Map<String, dynamic>>? _findExistingByBarcode(String barcode) {
+    for (final e in scannedItems.entries) {
+      if (e.value['barcode'] == barcode) return e;
+    }
+    return null;
+  }
+
+  /// Scan barcode -> cari di master_produk + sector yang valid buat barcode
+  /// itu (tabel produk_sectors) -> munculin dialog pilih sector + isi qty.
   Future<void> scanBarcode(String code) async {
     if (selectedSession == null) return;
 
-    Map<String, dynamic> product;
-    num? qtyAwal;
+    final existing = _findExistingByBarcode(code);
 
-    if (scannedItems.containsKey(code)) {
-      // Udah pernah discan di batch ini -> buka dialog buat edit qty-nya
-      product = scannedItems[code]!['product'] as Map<String, dynamic>;
-      qtyAwal = scannedItems[code]!['qty'] as num;
+    Map<String, dynamic> product;
+    List<Map<String, dynamic>> sectorOptions;
+
+    if (existing != null) {
+      // Udah pernah discan (di sector manapun) -> pake cache, gak query ulang
+      product = existing.value['product'] as Map<String, dynamic>;
+      sectorOptions =
+          existing.value['sectorOptions'] as List<Map<String, dynamic>>;
     } else {
       try {
         final data = await supabase
@@ -131,8 +149,40 @@ class _ScannerState extends State<Scanner> {
           return;
         }
         product = data;
+
+        // Sector mana aja yang valid buat barcode ini (bisa lebih dari 1)
+        final psData = await supabase
+            .from('produk_sectors')
+            .select('sector_id, sectors(nama, zone_id, zones(nama))')
+            .eq('barcode', code);
+
+        sectorOptions = List<Map<String, dynamic>>.from(psData).map((ps) {
+          final sector = ps['sectors'] as Map<String, dynamic>?;
+          final zone = sector?['zones'] as Map<String, dynamic>?;
+          final parts = [zone?['nama'], sector?['nama']]
+              .where((e) => e != null && e.toString().trim().isNotEmpty)
+              .toList();
+          return {
+            'sectorId': ps['sector_id'].toString(),
+            'label': parts.isEmpty
+                ? (ps['sector_id']?.toString() ?? '-')
+                : parts.join(' · '),
+          };
+        }).toList();
+
+        if (sectorOptions.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    "Produk ini belum di-assign ke sector manapun. Hubungi admin."),
+              ),
+            );
+          }
+          return;
+        }
       } catch (e) {
-        debugPrint("Gagal cari produk: $e");
+        debugPrint("Gagal cari produk/sector: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Gagal cek barcode: $e")),
@@ -145,57 +195,103 @@ class _ScannerState extends State<Scanner> {
     await player.play(AssetSource("beep.mp3"));
     if (!mounted) return;
 
-    final hasil = await showQtyDialog(
+    final preselectedSectorId = existing != null
+        ? existing.value['sectorId'] as String
+        : sectorOptions.first['sectorId'] as String;
+    final qtyAwal = existing != null ? existing.value['qty'] as num : null;
+
+    final hasil = await showScanDialog(
       namaItem: product['nama'] ?? 'Unknown',
       satuan: product['satuan'] ?? '',
+      sectorOptions: sectorOptions,
+      preselectedSectorId: preselectedSectorId,
       qtyAwal: qtyAwal,
     );
 
     if (hasil == null) return; // dibatalin, gak ada perubahan
 
+    final sectorId = hasil['sectorId'] as String;
+    final qty = hasil['qty'] as num;
+    final newKey = '$code|$sectorId';
+    final sectorLabel =
+        sectorOptions.firstWhere((s) => s['sectorId'] == sectorId)['label'] as String;
+
     setState(() {
-      if (hasil <= 0) {
-        scannedItems.remove(code);
+      // Kalau tadinya udah ada entry (sector lama) buat barcode yang sama,
+      // tapi user sekarang milih sector yang beda -> pindahin (bukan dobel).
+      if (existing != null && existing.key != newKey) {
+        scannedItems.remove(existing.key);
+      }
+      if (qty <= 0) {
+        scannedItems.remove(newKey);
       } else {
-        scannedItems[code] = {'product': product, 'qty': hasil};
+        scannedItems[newKey] = {
+          'barcode': code,
+          'product': product,
+          'sectorOptions': sectorOptions,
+          'sectorId': sectorId,
+          'sectorLabel': sectorLabel,
+          'qty': qty,
+        };
       }
     });
   }
 
-  /// Buka dialog qty buat produk yang udah ada di list, tanpa perlu scan ulang.
-  Future<void> editQty(String barcode) async {
-    final current = scannedItems[barcode];
+  /// Buka dialog buat produk yang udah ada di list, tanpa perlu scan ulang.
+  /// Bisa ubah qty ATAU pindah sector-nya dari sini.
+  Future<void> editItem(String key) async {
+    final current = scannedItems[key];
     if (current == null) return;
-    final product = current['product'] as Map<String, dynamic>;
 
-    final hasil = await showQtyDialog(
+    final product = current['product'] as Map<String, dynamic>;
+    final sectorOptions = current['sectorOptions'] as List<Map<String, dynamic>>;
+    final barcode = current['barcode'] as String;
+
+    final hasil = await showScanDialog(
       namaItem: product['nama'] ?? 'Unknown',
       satuan: product['satuan'] ?? '',
+      sectorOptions: sectorOptions,
+      preselectedSectorId: current['sectorId'] as String,
       qtyAwal: current['qty'] as num,
     );
 
     if (hasil == null) return;
 
+    final sectorId = hasil['sectorId'] as String;
+    final qty = hasil['qty'] as num;
+    final newKey = '$barcode|$sectorId';
+    final sectorLabel =
+        sectorOptions.firstWhere((s) => s['sectorId'] == sectorId)['label'] as String;
+
     setState(() {
-      if (hasil <= 0) {
-        scannedItems.remove(barcode);
+      if (key != newKey) scannedItems.remove(key);
+      if (qty <= 0) {
+        scannedItems.remove(newKey);
       } else {
-        current['qty'] = hasil;
+        scannedItems[newKey] = {
+          ...current,
+          'sectorId': sectorId,
+          'sectorLabel': sectorLabel,
+          'qty': qty,
+        };
       }
     });
   }
 
   /// Hapus item dari list hasil scan (dengan konfirmasi dulu).
-  Future<void> hapusItem(String barcode) async {
-    final current = scannedItems[barcode];
+  Future<void> hapusItem(String key) async {
+    final current = scannedItems[key];
     if (current == null) return;
     final product = current['product'] as Map<String, dynamic>;
+    final sectorLabel = current['sectorLabel'] as String;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text("Hapus Item"),
-        content: Text("Hapus \"${product['nama'] ?? barcode}\" dari list scan ini?"),
+        content: Text(
+          "Hapus \"${product['nama'] ?? current['barcode']}\" (sector $sectorLabel) dari list scan ini?",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -211,41 +307,93 @@ class _ScannerState extends State<Scanner> {
     );
 
     if (confirmed == true) {
-      setState(() => scannedItems.remove(barcode));
+      setState(() => scannedItems.remove(key));
     }
   }
 
-  Future<num?> showQtyDialog({
+  /// Dialog gabungan: pilih sector (dropdown, cuma muncul kalau produknya
+  /// ke-assign ke lebih dari 1 sector) + isi qty fisik.
+  Future<Map<String, dynamic>?> showScanDialog({
     required String namaItem,
     required String satuan,
+    required List<Map<String, dynamic>> sectorOptions,
+    required String preselectedSectorId,
     num? qtyAwal,
   }) {
     final qtyCtrl =
         TextEditingController(text: qtyAwal != null ? qtyAwal.toString() : '');
+    String selectedSectorId = preselectedSectorId;
 
-    return showDialog<num>(
+    return showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(namaItem),
-        content: TextField(
-          controller: qtyCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: InputDecoration(labelText: "Qty Fisik", suffixText: satuan),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(namaItem),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (sectorOptions.length > 1) ...[
+                const Text("Sector",
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedSectorId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  items: sectorOptions
+                      .map((s) => DropdownMenuItem<String>(
+                            value: s['sectorId'] as String,
+                            child: Text(s['label'] as String,
+                                overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setDialogState(() => selectedSectorId = val);
+                  },
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        size: 16, color: Color(0xff174A93)),
+                    const SizedBox(width: 6),
+                    Text(sectorOptions.first['label'] as String,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                autofocus: true,
+                decoration: InputDecoration(labelText: "Qty Fisik", suffixText: satuan),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final val = num.tryParse(qtyCtrl.text.trim()) ?? qtyAwal ?? 1;
+                Navigator.pop(dialogContext, {
+                  'sectorId': selectedSectorId,
+                  'qty': val,
+                });
+              },
+              child: const Text("Simpan"),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final val = num.tryParse(qtyCtrl.text.trim()) ?? qtyAwal ?? 1;
-              Navigator.pop(context, val);
-            },
-            child: const Text("Simpan"),
-          ),
-        ],
       ),
     );
   }
@@ -267,11 +415,12 @@ class _ScannerState extends State<Scanner> {
     setState(() => isUploading = true);
     try {
       final sessionId = selectedSession!['id'];
-      final payload = scannedItems.entries.map((e) {
+      final payload = scannedItems.values.map((item) {
         return {
           'session_id': sessionId,
-          'barcode': e.key,
-          'qty_fisik': e.value['qty'],
+          'barcode': item['barcode'],
+          'sector_id': item['sectorId'],
+          'qty_fisik': item['qty'],
           'updated_by': uid, // UUID akun yang login, sesuai FK profiles(id)
           'updated_at': DateTime.now().toIso8601String(),
         };
@@ -473,19 +622,22 @@ class _ScannerState extends State<Scanner> {
                   ? const Center(child: Text("Mulai scan barcode barang..."))
                   : ListView(
                       children: scannedItems.entries.map((e) {
-                        final barcode = e.key;
+                        final key = e.key;
+                        final barcode = e.value['barcode'] as String;
                         final product = e.value['product'] as Map<String, dynamic>;
+                        final sectorLabel = e.value['sectorLabel'] as String;
                         final qty = e.value['qty'];
 
                         return Card(
                           margin:
                               const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           child: ListTile(
-                            onTap: () => editQty(barcode),
+                            onTap: () => editItem(key),
                             title: Text(product['nama'] ?? "Unknown"),
                             subtitle: Text(
-                              "${product['satuan'] ?? ''} · Barcode: $barcode",
+                              "${product['satuan'] ?? ''} · Sector: $sectorLabel\nBarcode: $barcode",
                             ),
+                            isThreeLine: true,
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -505,12 +657,12 @@ class _ScannerState extends State<Scanner> {
                                 IconButton(
                                   icon: const Icon(Icons.edit,
                                       size: 20, color: Color(0xff174A93)),
-                                  onPressed: () => editQty(barcode),
+                                  onPressed: () => editItem(key),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline,
                                       size: 20, color: Colors.red),
-                                  onPressed: () => hapusItem(barcode),
+                                  onPressed: () => hapusItem(key),
                                 ),
                               ],
                             ),
