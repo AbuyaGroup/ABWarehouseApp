@@ -3,6 +3,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:abwarehouse/app_theme.dart';
+
 /// Fitur utama: scan produk fisik per DC.
 /// Alur: pilih DC (admin) -> pilih sesi opname aktif -> scan -> upload.
 /// Tiap scan munculin dialog pilih SECTOR (produk bisa ada di lebih dari
@@ -36,7 +38,7 @@ class _ScannerState extends State<Scanner> {
 
   // Hasil scan yang masih di device, belum di-upload ke opname_entries.
   // Key = "barcode|sectorId" (satu produk bisa kehitung di lebih dari satu
-  // sector dalam batch yang sama). Value = {
+  // sector dalam batch yang sama, dan itu SENGAJA -- bukan bug). Value = {
   //   'barcode', 'product' (dari master_produk), 'sectorOptions' (cache
   //   semua sector yang valid buat barcode ini, biar gak query ulang),
   //   'sectorId', 'sectorLabel', 'qty'
@@ -108,30 +110,36 @@ class _ScannerState extends State<Scanner> {
     });
   }
 
-  /// Cari data barcode+sector yang UDAH pernah discan di batch ini (di
-  /// sector manapun), buat cache produk/sectorOptions & preselect dialog.
-  MapEntry<String, Map<String, dynamic>>? _findExistingByBarcode(String barcode) {
-    for (final e in scannedItems.entries) {
-      if (e.value['barcode'] == barcode) return e;
-    }
-    return null;
+  /// Semua entry yang UDAH discan buat barcode ini, dari sector manapun aja.
+  /// Satu barcode sekarang boleh punya lebih dari satu entry (multi-sector
+  /// dalam satu batch) -- makanya ini balikin LIST, bukan satu match doang.
+  List<MapEntry<String, Map<String, dynamic>>> _findExistingByBarcode(String barcode) {
+    return scannedItems.entries.where((e) => e.value['barcode'] == barcode).toList();
   }
 
   /// Scan barcode -> cari di master_produk + sector yang valid buat barcode
   /// itu (tabel produk_sectors) -> munculin dialog pilih sector + isi qty.
+  ///
+  /// Kalau barcode ini UDAH pernah discan sebelumnya (di sector laen), dialog
+  /// otomatis nyaranin sector yang BELUM kepake buat barcode ini -- jadi alur
+  /// naturalnya: scan -> pilih Sector A -> scan lagi (barcode sama) -> udah
+  /// keisi otomatis Sector B (yang belum) -> simpen. Dua-duanya numpuk bareng
+  /// di scannedItems, siap di-upload sekaligus. Kalau semua sector yang valid
+  /// buat barcode itu udah kepake semua, baru dianggep "edit ulang" -- dialog
+  /// preselect ke sector pertama & qty lama ke-isi otomatis.
   Future<void> scanBarcode(String code) async {
     if (selectedSession == null) return;
 
-    final existing = _findExistingByBarcode(code);
+    final existingEntries = _findExistingByBarcode(code);
 
     Map<String, dynamic> product;
     List<Map<String, dynamic>> sectorOptions;
 
-    if (existing != null) {
+    if (existingEntries.isNotEmpty) {
       // Udah pernah discan (di sector manapun) -> pake cache, gak query ulang
-      product = existing.value['product'] as Map<String, dynamic>;
+      product = existingEntries.first.value['product'] as Map<String, dynamic>;
       sectorOptions =
-          existing.value['sectorOptions'] as List<Map<String, dynamic>>;
+          existingEntries.first.value['sectorOptions'] as List<Map<String, dynamic>>;
     } else {
       try {
         final data = await supabase
@@ -162,7 +170,12 @@ class _ScannerState extends State<Scanner> {
           final parts = [zone?['nama'], sector?['nama']]
               .where((e) => e != null && e.toString().trim().isNotEmpty)
               .toList();
-          return {
+          // Dipaksa <String, dynamic> secara eksplisit -- kalau dibiarin
+          // Dart nebak sendiri, semua value di map literal ini kebetulan
+          // String semua, jadi Dart bakal infer Map<String, String>, bukan
+          // Map<String, dynamic> yang dideklarasiin di atas. Beda tipe run-
+          // time ini yang bikin firstWhere/orElse di bawah nanti crash.
+          return <String, dynamic>{
             'sectorId': ps['sector_id'].toString(),
             'label': parts.isEmpty
                 ? (ps['sector_id']?.toString() ?? '-')
@@ -192,13 +205,35 @@ class _ScannerState extends State<Scanner> {
       }
     }
 
-    await player.play(AssetSource("beep.mp3"));
+    // Suara "beep" -- dibungkus try/catch sendiri, soalnya di sebagian
+    // device/emulator audio plugin-nya suka gagal (device audio gak
+    // kedetect, dll). Kalau ini dibiarin throw tanpa ditangkep, seluruh
+    // scanBarcode() ikut berhenti di tengah jalan dan canScan bisa kejebak.
+    try {
+      await player.play(AssetSource("beep.mp3"));
+    } catch (e) {
+      debugPrint("Gagal muter suara beep (diabaikan, lanjut scan): $e");
+    }
     if (!mounted) return;
 
-    final preselectedSectorId = existing != null
-        ? existing.value['sectorId'] as String
-        : sectorOptions.first['sectorId'] as String;
-    final qtyAwal = existing != null ? existing.value['qty'] as num : null;
+    // Sector-sector yang UDAH kepake buat barcode ini di batch sekarang
+    final usedSectorIds =
+        existingEntries.map((e) => e.value['sectorId'] as String).toSet();
+
+    // Preselect ke sector PERTAMA YANG BELUM KEPAKE (biar alur "scan lagi buat
+    // sector laen" natural). Kalau semua sector udah kepake semua, fallback ke
+    // sector pertama (berarti mode edit ulang qty di sector itu).
+    final sectorTerpilih = sectorOptions.firstWhere(
+      (s) => !usedSectorIds.contains(s['sectorId']),
+      orElse: () => sectorOptions.first,
+    );
+    final preselectedSectorId = sectorTerpilih['sectorId'] as String;
+
+    // Qty awal cuma di-prefill kalau kombinasi barcode+sector INI PERSIS udah
+    // punya entry sebelumnya (berarti emang mau diedit qty-nya). Kalau ini
+    // sector baru yang belum pernah discan, field qty dibiarin kosong.
+    final entryUntukSectorIni = scannedItems['$code|$preselectedSectorId'];
+    final qtyAwal = entryUntukSectorIni?['qty'] as num?;
 
     final hasil = await showScanDialog(
       namaItem: product['nama'] ?? 'Unknown',
@@ -217,11 +252,9 @@ class _ScannerState extends State<Scanner> {
         sectorOptions.firstWhere((s) => s['sectorId'] == sectorId)['label'] as String;
 
     setState(() {
-      // Kalau tadinya udah ada entry (sector lama) buat barcode yang sama,
-      // tapi user sekarang milih sector yang beda -> pindahin (bukan dobel).
-      if (existing != null && existing.key != newKey) {
-        scannedItems.remove(existing.key);
-      }
+      // CATATAN: gak ada lagi logic "hapus entry sector lama" di sini kaya
+      // sebelumnya -- sekarang barcode yang sama BOLEH punya banyak entry,
+      // satu per sector, dan semuanya numpuk bareng siap di-upload sekaligus.
       if (qty <= 0) {
         scannedItems.remove(newKey);
       } else {
@@ -238,7 +271,11 @@ class _ScannerState extends State<Scanner> {
   }
 
   /// Buka dialog buat produk yang udah ada di list, tanpa perlu scan ulang.
-  /// Bisa ubah qty ATAU pindah sector-nya dari sini.
+  /// Bisa ubah qty ATAU pindah sector-nya dari sini. INI BEDA sama scanBarcode:
+  /// disini user secara eksplisit ngedit SATU entry tertentu, jadi kalau
+  /// sector-nya diganti, entry lama itu emang dipindah (bukan nambah baru) --
+  /// kecuali kalau sector tujuannya udah kepake sama entry laen, di situ bakal
+  /// ditanya dulu biar gak ketiban tanpa sadar.
   Future<void> editItem(String key) async {
     final current = scannedItems[key];
     if (current == null) return;
@@ -262,6 +299,32 @@ class _ScannerState extends State<Scanner> {
     final newKey = '$barcode|$sectorId';
     final sectorLabel =
         sectorOptions.firstWhere((s) => s['sectorId'] == sectorId)['label'] as String;
+
+    // Kalau user ganti ke sector laen yang KEBETULAN udah ada entry-nya
+    // sendiri (dari scan terpisah), konfirmasi dulu biar gak ketiban diem2.
+    if (newKey != key && scannedItems.containsKey(newKey)) {
+      final overwrite = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text("Sector Ini Udah Ada Entry-nya"),
+          content: Text(
+            "Sector ${sectorLabel} buat produk ini udah ada entry lain "
+            "(qty ${scannedItems[newKey]!['qty']}). Timpa dengan qty $qty?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text("Timpa"),
+            ),
+          ],
+        ),
+      );
+      if (overwrite != true) return;
+    }
 
     setState(() {
       if (key != newKey) scannedItems.remove(key);
@@ -298,7 +361,7 @@ class _ScannerState extends State<Scanner> {
             child: const Text("Batal"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text("Hapus"),
           ),
@@ -361,7 +424,7 @@ class _ScannerState extends State<Scanner> {
                 Row(
                   children: [
                     const Icon(Icons.location_on_outlined,
-                        size: 16, color: Color(0xff174A93)),
+                        size: 16, color: AppColors.primary),
                     const SizedBox(width: 6),
                     Text(sectorOptions.first['label'] as String,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -426,7 +489,16 @@ class _ScannerState extends State<Scanner> {
         };
       }).toList();
 
-      await supabase.from('opname_entries').insert(payload);
+      // upsert -- BUKAN insert biasa. Kombinasi session_id+barcode+sector_id
+      // itu punya UNIQUE constraint (opname_entries_session_barcode_sector_key)
+      // di database, biar barcode+sector yang sama gak numpuk row dobel kalau
+      // di-upload lagi di batch laen (misal: recount, atau upload kedua di
+      // hari yang beda). upsert bikin row lama otomatis ke-REPLACE (qty &
+      // updated_at ke-update), bukan ditolak kaya insert biasa.
+      await supabase.from('opname_entries').upsert(
+        payload,
+        onConflict: 'session_id,barcode,sector_id',
+      );
 
       final jumlah = scannedItems.length;
       if (mounted) {
@@ -531,13 +603,12 @@ class _ScannerState extends State<Scanner> {
                     final tgl = tglRaw.length >= 10 ? tglRaw.substring(0, 10) : tglRaw;
 
                     return Card(
-                      elevation: 2,
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         leading: const CircleAvatar(
-                          backgroundColor: Color(0xff174A93),
+                          backgroundColor: AppColors.primary,
                           child: Icon(Icons.date_range, color: Colors.white),
                         ),
                         title: Text(namaSesi,
@@ -576,7 +647,7 @@ class _ScannerState extends State<Scanner> {
                   child: const Text("Batal"),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
                   onPressed: () {
                     Navigator.pop(dialogContext);
                     setState(() => selectedSession = null);
@@ -610,9 +681,23 @@ class _ScannerState extends State<Scanner> {
                   if (code == null) return;
 
                   canScan = false;
-                  await scanBarcode(code);
-                  await Future.delayed(const Duration(milliseconds: 700));
-                  canScan = true;
+                  try {
+                    await scanBarcode(code);
+                  } catch (e, st) {
+                    // Apapun yang error di dalem scanBarcode (query gagal,
+                    // dialog error, dll) -- JANGAN sampe bikin canScan
+                    // kejebak di false selamanya, soalnya itu bikin kamera
+                    // keliatan jalan tapi gak pernah ngedetect apa-apa lagi.
+                    debugPrint("Error pas scanBarcode: $e\n$st");
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Gagal proses scan: $e")),
+                      );
+                    }
+                  } finally {
+                    await Future.delayed(const Duration(milliseconds: 700));
+                    canScan = true;
+                  }
                 },
               ),
             ),
@@ -645,8 +730,8 @@ class _ScannerState extends State<Scanner> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xffF4F6FA),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: AppColors.primarySoft,
+                                    borderRadius: BorderRadius.circular(AppRadius.sm),
                                   ),
                                   child: Text(
                                     "$qty",
@@ -656,12 +741,12 @@ class _ScannerState extends State<Scanner> {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.edit,
-                                      size: 20, color: Color(0xff174A93)),
+                                      size: 20, color: AppColors.primary),
                                   onPressed: () => editItem(key),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline,
-                                      size: 20, color: Colors.red),
+                                      size: 20, color: AppColors.danger),
                                   onPressed: () => hapusItem(key),
                                 ),
                               ],
@@ -694,11 +779,11 @@ class _ScannerState extends State<Scanner> {
                           : "Upload${scannedItems.isEmpty ? '' : ' (${scannedItems.length})'}",
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff174A93),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 1),
                       ),
                     ),
                   ),
