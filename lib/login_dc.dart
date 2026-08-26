@@ -18,7 +18,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
   bool obscurePassword = true;
   String? error;
 
-  // Domain internal buat akun Supabase. User cuma perlu inget username-nya
+  // Domain internal buat akun Supabase. User cuma perlu inget user name-nya
   // doang, domain ini nempel otomatis di belakang layar.
   static const _emailDomain = 'abuyagroup.com';
 
@@ -142,7 +142,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
             controller: usernameCtrl,
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(hintText: "budi (atau budi@abuyagroup.com)"),
+            decoration: const InputDecoration(hintText: "...."),
           ),
           const SizedBox(height: 16),
           Text("Password", style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.muted)),
@@ -152,7 +152,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
             obscureText: obscurePassword,
             onSubmitted: (_) => loading ? null : doLogin(),
             decoration: InputDecoration(
-              hintText: "••••••••",
+              hintText: "....",
               suffixIcon: IconButton(
                 icon: Icon(
                   obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
