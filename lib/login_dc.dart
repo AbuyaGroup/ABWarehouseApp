@@ -55,79 +55,6 @@ class _LoginDcPageState extends State<LoginDcPage> {
     // Gak pake AppBar -- di web, loginScreen juga full-bleed tanpa topbar,
     // langsung gradient background + card di tengah.
     return Scaffold(
-<<<<<<< HEAD
-      appBar: AppBar(title: const Text("Login Stock Opname")),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - 48, // 48 = padding atas+bawah
-                ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Image.asset(
-                        'assets/images/logo_ABI.png',
-                        height: 220,
-                      ),
-                      const SizedBox(height: 24),
-                      if (error != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFCEBEB),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(error!, style: const TextStyle(color: Color(0xFF791F1F))),
-                        ),
-                      TextField(
-                        controller: usernameCtrl,
-                        keyboardType: TextInputType.text,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(labelText: "Username", border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: passCtrl,
-                        obscureText: obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: "Password",
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword ? Icons.visibility_off : Icons.visibility,
-                              color: const Color(0xff174A93),
-                            ),
-                            onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                          ),
-                        ),
-                        onSubmitted: (_) => loading ? null : doLogin(),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: loading ? null : doLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xff174A93),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: loading
-                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text("Masuk"),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-=======
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -149,14 +76,10 @@ class _LoginDcPageState extends State<LoginDcPage> {
               );
             },
           ),
->>>>>>> 8497e2c200f6c00a6239c22e9303091cb24f69ef
         ),
       ),
     );
   }
-<<<<<<< HEAD
-}
-=======
 
   Widget _loginCard() {
     return Container(
@@ -213,12 +136,13 @@ class _LoginDcPageState extends State<LoginDcPage> {
             ),
             const SizedBox(height: 16),
           ],
-          Text("Email", style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.muted)),
+          Text("Username", style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.muted)),
           const SizedBox(height: 6),
           TextField(
-            controller: emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(hintText: "nama@abuyagroup.com"),
+            controller: usernameCtrl,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(hintText: "budi (atau budi@abuyagroup.com)"),
           ),
           const SizedBox(height: 16),
           Text("Password", style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.muted)),
@@ -281,4 +205,3 @@ class _LoginDcPageState extends State<LoginDcPage> {
     );
   }
 }
->>>>>>> 8497e2c200f6c00a6239c22e9303091cb24f69ef

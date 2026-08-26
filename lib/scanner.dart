@@ -308,11 +308,7 @@ class _ScannerState extends State<Scanner> {
         builder: (dialogContext) => AlertDialog(
           title: const Text("Sector Ini Udah Ada Entry-nya"),
           content: Text(
-<<<<<<< HEAD
             "Sector $sectorLabel buat produk ini udah ada entry lain "
-=======
-            "Sector ${sectorLabel} buat produk ini udah ada entry lain "
->>>>>>> 8497e2c200f6c00a6239c22e9303091cb24f69ef
             "(qty ${scannedItems[newKey]!['qty']}). Timpa dengan qty $qty?",
           ),
           actions: [
