@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:abwarehouse/scanner.dart';
+import 'package:abwarehouse/app_theme.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -10,28 +10,32 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xffF4F6FA),
-      appBar: AppBar(title: const Text("ABwarehouse"), centerTitle: true),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            StaggeredGrid.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 18,
-              crossAxisSpacing: 18,
-              children: [
-                StaggeredGridTile.count(
-                  crossAxisCellCount: 2,
-                  mainAxisCellCount: 1.2,
-                  child: _scannerCard(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _logoutButton(context),
-          ],
+      backgroundColor: AppColors.surface0,
+      appBar: AppBar(
+        title: Text("ABwarehouse", style: AppText.heading(size: 17)),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                "Scanner",
+                style: AppText.body(size: 13, weight: FontWeight.w600, color: AppColors.muted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Pilih menu buat mulai stock opname",
+                style: AppText.body(size: 13, color: AppColors.muted),
+              ),
+              const SizedBox(height: 18),
+              _scannerCard(context),
+              const Spacer(),
+              _logoutButton(context),
+            ],
+          ),
         ),
       ),
     );
@@ -41,15 +45,16 @@ class HomePage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Yakin mau keluar dari akun ini?"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+        title: Text("Logout", style: AppText.heading(size: 17)),
+        content: Text("Yakin mau keluar dari akun ini?", style: AppText.body(size: 13.5, color: AppColors.muted)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text("Batal"),
+            child: Text("Batal", style: AppText.body(size: 13.5, weight: FontWeight.w600, color: AppColors.muted)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text("Logout"),
           ),
@@ -66,59 +71,83 @@ class HomePage extends StatelessWidget {
 
   Widget _logoutButton(BuildContext context) => SizedBox(
         width: double.infinity,
-        child: ElevatedButton.icon(
+        height: 50,
+        child: OutlinedButton.icon(
           onPressed: () => _logout(context),
-          icon: const Icon(Icons.logout, color: Colors.white),
-          label: const Text("Logout"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade600,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+          icon: const Icon(Icons.logout, size: 18, color: AppColors.danger),
+          label: Text("Logout", style: AppText.body(size: 14, weight: FontWeight.w600, color: AppColors.danger)),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: AppColors.border),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm + 1)),
           ),
         ),
       );
 
-  Widget _scannerCard(BuildContext context) => InkWell(
-      borderRadius: BorderRadius.circular(28),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const Scanner()),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xff174A93),
-              Color(0xff081D3B),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+  // Kartu utama "Scanner" -- gradient + shadow + radius gede, ngikutin
+  // pola .dc-card / .zona-card di web (card gradient soft, radius 18-20px,
+  // shadow menyebar, ada aksen lingkaran transparan di pojok).
+  Widget _scannerCard(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const Scanner()),
+          ),
+          child: Ink(
+            padding: const EdgeInsets.all(26),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.primaryDeep],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(.28),
+                  blurRadius: 26,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(.16),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: const Icon(
+                    Icons.qr_code_scanner_rounded,
+                    color: Colors.white,
+                    size: 27,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  "Scanner",
+                  style: AppText.heading(size: 26, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Mulai scan barcode buat stock opname",
+                  style: AppText.body(size: 12.5, color: Colors.white.withOpacity(.78)),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Text("Buka", style: AppText.body(size: 12.5, weight: FontWeight.w600, color: Colors.white)),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward, size: 15, color: Colors.white),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.qr_code_scanner_rounded,
-              color: Colors.white,
-              size: 42,
-            ),
-            const Spacer(),
-            const Text(
-              "Scanner",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      );
 }

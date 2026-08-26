@@ -3,6 +3,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:abwarehouse/app_theme.dart';
+
 /// Fitur utama: scan produk fisik per DC.
 /// Alur: pilih DC (admin) -> pilih sesi opname aktif -> scan -> upload.
 /// Tiap scan munculin dialog pilih SECTOR (produk bisa ada di lebih dari
@@ -168,7 +170,12 @@ class _ScannerState extends State<Scanner> {
           final parts = [zone?['nama'], sector?['nama']]
               .where((e) => e != null && e.toString().trim().isNotEmpty)
               .toList();
-          return {
+          // Dipaksa <String, dynamic> secara eksplisit -- kalau dibiarin
+          // Dart nebak sendiri, semua value di map literal ini kebetulan
+          // String semua, jadi Dart bakal infer Map<String, String>, bukan
+          // Map<String, dynamic> yang dideklarasiin di atas. Beda tipe run-
+          // time ini yang bikin firstWhere/orElse di bawah nanti crash.
+          return <String, dynamic>{
             'sectorId': ps['sector_id'].toString(),
             'label': parts.isEmpty
                 ? (ps['sector_id']?.toString() ?? '-')
@@ -198,7 +205,15 @@ class _ScannerState extends State<Scanner> {
       }
     }
 
-    await player.play(AssetSource("beep.mp3"));
+    // Suara "beep" -- dibungkus try/catch sendiri, soalnya di sebagian
+    // device/emulator audio plugin-nya suka gagal (device audio gak
+    // kedetect, dll). Kalau ini dibiarin throw tanpa ditangkep, seluruh
+    // scanBarcode() ikut berhenti di tengah jalan dan canScan bisa kejebak.
+    try {
+      await player.play(AssetSource("beep.mp3"));
+    } catch (e) {
+      debugPrint("Gagal muter suara beep (diabaikan, lanjut scan): $e");
+    }
     if (!mounted) return;
 
     // Sector-sector yang UDAH kepake buat barcode ini di batch sekarang
@@ -293,7 +308,11 @@ class _ScannerState extends State<Scanner> {
         builder: (dialogContext) => AlertDialog(
           title: const Text("Sector Ini Udah Ada Entry-nya"),
           content: Text(
+<<<<<<< HEAD
             "Sector $sectorLabel buat produk ini udah ada entry lain "
+=======
+            "Sector ${sectorLabel} buat produk ini udah ada entry lain "
+>>>>>>> 8497e2c200f6c00a6239c22e9303091cb24f69ef
             "(qty ${scannedItems[newKey]!['qty']}). Timpa dengan qty $qty?",
           ),
           actions: [
@@ -346,7 +365,7 @@ class _ScannerState extends State<Scanner> {
             child: const Text("Batal"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text("Hapus"),
           ),
@@ -409,7 +428,7 @@ class _ScannerState extends State<Scanner> {
                 Row(
                   children: [
                     const Icon(Icons.location_on_outlined,
-                        size: 16, color: Color(0xff174A93)),
+                        size: 16, color: AppColors.primary),
                     const SizedBox(width: 6),
                     Text(sectorOptions.first['label'] as String,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -474,7 +493,16 @@ class _ScannerState extends State<Scanner> {
         };
       }).toList();
 
-      await supabase.from('opname_entries').insert(payload);
+      // upsert -- BUKAN insert biasa. Kombinasi session_id+barcode+sector_id
+      // itu punya UNIQUE constraint (opname_entries_session_barcode_sector_key)
+      // di database, biar barcode+sector yang sama gak numpuk row dobel kalau
+      // di-upload lagi di batch laen (misal: recount, atau upload kedua di
+      // hari yang beda). upsert bikin row lama otomatis ke-REPLACE (qty &
+      // updated_at ke-update), bukan ditolak kaya insert biasa.
+      await supabase.from('opname_entries').upsert(
+        payload,
+        onConflict: 'session_id,barcode,sector_id',
+      );
 
       final jumlah = scannedItems.length;
       if (mounted) {
@@ -579,13 +607,12 @@ class _ScannerState extends State<Scanner> {
                     final tgl = tglRaw.length >= 10 ? tglRaw.substring(0, 10) : tglRaw;
 
                     return Card(
-                      elevation: 2,
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         leading: const CircleAvatar(
-                          backgroundColor: Color(0xff174A93),
+                          backgroundColor: AppColors.primary,
                           child: Icon(Icons.date_range, color: Colors.white),
                         ),
                         title: Text(namaSesi,
@@ -624,7 +651,7 @@ class _ScannerState extends State<Scanner> {
                   child: const Text("Batal"),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
                   onPressed: () {
                     Navigator.pop(dialogContext);
                     setState(() => selectedSession = null);
@@ -658,9 +685,23 @@ class _ScannerState extends State<Scanner> {
                   if (code == null) return;
 
                   canScan = false;
-                  await scanBarcode(code);
-                  await Future.delayed(const Duration(milliseconds: 700));
-                  canScan = true;
+                  try {
+                    await scanBarcode(code);
+                  } catch (e, st) {
+                    // Apapun yang error di dalem scanBarcode (query gagal,
+                    // dialog error, dll) -- JANGAN sampe bikin canScan
+                    // kejebak di false selamanya, soalnya itu bikin kamera
+                    // keliatan jalan tapi gak pernah ngedetect apa-apa lagi.
+                    debugPrint("Error pas scanBarcode: $e\n$st");
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Gagal proses scan: $e")),
+                      );
+                    }
+                  } finally {
+                    await Future.delayed(const Duration(milliseconds: 700));
+                    canScan = true;
+                  }
                 },
               ),
             ),
@@ -693,8 +734,8 @@ class _ScannerState extends State<Scanner> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xffF4F6FA),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: AppColors.primarySoft,
+                                    borderRadius: BorderRadius.circular(AppRadius.sm),
                                   ),
                                   child: Text(
                                     "$qty",
@@ -704,12 +745,12 @@ class _ScannerState extends State<Scanner> {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.edit,
-                                      size: 20, color: Color(0xff174A93)),
+                                      size: 20, color: AppColors.primary),
                                   onPressed: () => editItem(key),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline,
-                                      size: 20, color: Colors.red),
+                                      size: 20, color: AppColors.danger),
                                   onPressed: () => hapusItem(key),
                                 ),
                               ],
@@ -742,11 +783,11 @@ class _ScannerState extends State<Scanner> {
                           : "Upload${scannedItems.isEmpty ? '' : ' (${scannedItems.length})'}",
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff174A93),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 1),
                       ),
                     ),
                   ),

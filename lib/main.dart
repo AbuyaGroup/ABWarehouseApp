@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:abwarehouse/auth_gate.dart';
+import 'package:abwarehouse/app_theme.dart';
 
 // GANTI dengan Project URL & anon key Supabase lo
 // (yang sama persis dipake di web opname-afc)
@@ -30,9 +31,12 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
-  Widget build(BuildContext context) => const MaterialApp(
+  Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: AuthGate(),
+        // Theme global -- disamain sama design token web (css/style.css),
+        // biar semua Scaffold/Button/TextField di app otomatis kena tanpa
+        // perlu di-style manual satu-satu.
+        theme: buildAppTheme(),
+        home: const AuthGate(),
       );
 }
-
