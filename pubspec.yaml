@@ -34,7 +34,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/beep.mp3
+    - assets/kagetshort.mp3
     - assets/images/logo_ABI.png
     - assets/icon/logo_ABI.png
 
