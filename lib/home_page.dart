@@ -12,7 +12,7 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.surface0,
       appBar: AppBar(
-        title: Text("ABwarehouse", style: AppText.heading(size: 17)),
+        title: Text("ABWarehouse", style: AppText.heading(size: 17)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -105,7 +105,7 @@ class HomePage extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(.28),
+                  color: AppColors.primary.withValues(alpha: .28),
                   blurRadius: 26,
                   offset: const Offset(0, 14),
                 ),
@@ -118,7 +118,7 @@ class HomePage extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.16),
+                    color: Colors.white.withValues(alpha: .16),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: const Icon(
@@ -135,7 +135,7 @@ class HomePage extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   "Mulai scan barcode buat stock opname",
-                  style: AppText.body(size: 12.5, color: Colors.white.withOpacity(.78)),
+                  style: AppText.body(size: 12.5, color: Colors.white.withValues(alpha: .78)),
                 ),
                 const SizedBox(height: 16),
                 Row(

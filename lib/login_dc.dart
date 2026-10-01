@@ -29,26 +29,51 @@ class _LoginDcPageState extends State<LoginDcPage> {
     return '$trimmed@$_emailDomain';
   }
 
-  Future<void> doLogin() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
-    try {
-      await supabase.auth.signInWithPassword(
-        email: _buildEmail(usernameCtrl.text),
-        password: passCtrl.text,
-      );
-      // Gak perlu navigasi manual -- AuthGate otomatis switch ke HomePage
-      // begitu status login berubah (didengerin via onAuthStateChange).
-    } on AuthException catch (e) {
-      setState(() => error = e.message);
-    } catch (e) {
-      setState(() => error = "Gagal login: $e");
-    } finally {
-      if (mounted) setState(() => loading = false);
+Future<void> doLogin() async {
+  setState(() {
+    loading = true;
+    error = null;
+  });
+
+  try {
+    final auth = await supabase.auth.signInWithPassword(
+      email: _buildEmail(usernameCtrl.text),
+      password: passCtrl.text,
+    );
+
+    final uid = auth.user?.id;
+    if (uid == null) {
+      throw const AuthException('Login gagal. Coba lagi.');
     }
+
+    final profile = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', uid)
+        .maybeSingle();
+
+    // Aplikasi HP hanya untuk scanner.
+    if (profile == null || profile['role'] != 'scanner') {
+      await supabase.auth.signOut();
+
+      if (mounted) {
+        setState(() {
+          error = 'Akun ini khusus untuk web. '
+              'Silakan login memakai akun scanner.';
+        });
+      }
+      return;
+    }
+
+    // AuthGate otomatis membuka HomePage setelah login berhasil.
+  } on AuthException catch (e) {
+    if (mounted) setState(() => error = e.message);
+  } catch (e) {
+    if (mounted) setState(() => error = 'Gagal login: $e');
+  } finally {
+    if (mounted) setState(() => loading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +114,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
         borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF040C2C).withOpacity(.34),
+            color: const Color(0xFF040C2C).withValues(alpha: .34),
             blurRadius: 60,
             offset: const Offset(0, 22),
           ),
@@ -110,7 +135,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
           ),
           const SizedBox(height: 18),
           Text(
-            "ABwarehouse",
+            "ABWarehouse",
             textAlign: TextAlign.center,
             style: AppText.heading(size: 24),
           ),
@@ -173,7 +198,7 @@ class _LoginDcPageState extends State<LoginDcPage> {
                 borderRadius: BorderRadius.circular(AppRadius.sm + 1),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(.28),
+                    color: AppColors.primary.withValues(alpha: .28),
                     blurRadius: 18,
                     offset: const Offset(0, 9),
                   ),

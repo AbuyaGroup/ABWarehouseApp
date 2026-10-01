@@ -205,14 +205,14 @@ class _ScannerState extends State<Scanner> {
       }
     }
 
-    // Suara "beep" -- dibungkus try/catch sendiri, soalnya di sebagian
+    // Suara "wo" -- dibungkus try/catch sendiri, soalnya di sebagian
     // device/emulator audio plugin-nya suka gagal (device audio gak
     // kedetect, dll). Kalau ini dibiarin throw tanpa ditangkep, seluruh
     // scanBarcode() ikut berhenti di tengah jalan dan canScan bisa kejebak.
     try {
-      await player.play(AssetSource("beep.mp3"));
+      await player.play(AssetSource("wo.mp3"));
     } catch (e) {
-      debugPrint("Gagal muter suara beep (diabaikan, lanjut scan): $e");
+      debugPrint("Gagal muter suara wo (diabaikan, lanjut scan): $e");
     }
     if (!mounted) return;
 

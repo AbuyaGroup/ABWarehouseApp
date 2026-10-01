@@ -45,12 +45,12 @@ class AppShadow {
   // Nyamain kira-kira sama --shadow di CSS: soft, menyebar, gak tajem
   static List<BoxShadow> soft = [
     BoxShadow(
-      color: const Color(0xFF1D3269).withOpacity(.08),
+      color: const Color(0xFF1D3269).withValues(alpha: .08),
       blurRadius: 35,
       offset: const Offset(0, 12),
     ),
     BoxShadow(
-      color: const Color(0xFF1D3269).withOpacity(.04),
+      color: const Color(0xFF1D3269).withValues(alpha: .04),
       blurRadius: 5,
       offset: const Offset(0, 2),
     ),
