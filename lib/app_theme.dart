@@ -1,135 +1,300 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Design tokens buat seluruh app -- disamain PERSIS sama variabel CSS
-/// (`:root{...}`) di css/style.css punya web dashboard ABWarehouse, biar
-/// app Flutter & web-nya keliatan senada, bukan dua produk yang beda.
+/// Design token dari folder "New Design Scanner" (light theme).
+/// Nama field ngikutin nama token di tailwind config design-nya.
 class AppColors {
-  static const ink = Color(0xFF17213A);
-  static const surface0 = Color(0xFFF4F7FB); // background utama
-  static const surface1 = Color(0xFFFFFFFF); // card/permukaan
-  static const border = Color(0xFFE5EBF4);
-  static const muted = Color(0xFF71809A);
-  static const primary = Color(0xFF3455DB);
-  static const primarySoft = Color(0xFFEEF1FF);
-  static const primaryDeep = Color(0xFF223BAE);
-  static const success = Color(0xFF117B58);
-  static const successSoft = Color(0xFFE9F8F2);
-  static const danger = Color(0xFFD64157);
-  static const dangerSoft = Color(0xFFFFF0F2);
+  // Primary (biru navy)
+  static const primary = Color(0xFF1B2A5C);
+  static const onPrimary = Color(0xFFFFFFFF);
+  static const primaryContainer = Color(0xFF2E4A9E);
+  static const onPrimaryContainer = Color(0xFFE3E9FF);
 
-  // Gradient biru gelap yang dipake background login di web (loginScreen)
-  static const loginGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF101A42), Color(0xFF172766), Color(0xFF233E90)],
-  );
+  // Secondary (hijau sukses)
+  static const secondary = Color(0xFF006D30);
+  static const onSecondary = Color(0xFFFFFFFF);
+  static const secondaryContainer = Color(0xFF92F5A4);
+  static const onSecondaryContainer = Color(0xFF007233);
 
-  // Gradient buat tombol utama & icon aksen (btn-primary, .dc-icon gradient)
-  static const primaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF3D61E9), Color(0xFF2945C9)],
-  );
+  // Error
+  static const error = Color(0xFFBA1A1A);
+  static const errorContainer = Color(0xFFFFDAD6);
+  static const onErrorContainer = Color(0xFF93000A);
+
+  // Surface
+  static const surface = Color(0xFFF3F5F9);
+  static const surfaceContainerLowest = Color(0xFFFFFFFF);
+  static const surfaceContainerLow = Color(0xFFEBEFF5);
+  static const surfaceContainer = Color(0xFFE4E9F1);
+  static const surfaceContainerHigh = Color(0xFFDDE3EC);
+  static const surfaceContainerHighest = Color(0xFFD6DDE8);
+  static const onSurface = Color(0xFF1A1F2E);
+  static const onSurfaceVariant = Color(0xFF4A5468);
+  static const outline = Color(0xFF7A8499);
+  static const outlineVariant = Color(0xFFC9D1DE);
+
+  // Dark surface (dipake di layar kamera)
+  static const darkSurface = Color(0xFF10141F);
+  static const darkSurfaceContainerLow = Color(0xFF1A1F2E);
+  static const darkOnSurface = Color(0xFFE2E7F0);
+
+  // Alias lama biar kode lain gak patah
+  static const ink = onSurface;
+  static const muted = onSurfaceVariant;
+  static const border = outlineVariant;
+  static const danger = error;
+  static const dangerSoft = errorContainer;
+  static const success = secondary;
+  static const successSoft = secondaryContainer;
 }
 
 class AppRadius {
-  static const sm = 10.0; // input, chip kecil
-  static const md = 14.0; // card kecil, list item
-  static const lg = 18.0; // card besar (produk-toolbar, dll)
-  static const xl = 22.0; // modal, login card
-  static const xxl = 26.0;
+  static const sm = 4.0;
+  static const base = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+}
+
+class AppSpace {
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 16.0;
+  static const lg = 24.0;
+  static const xl = 32.0;
 }
 
 class AppShadow {
-  // Nyamain kira-kira sama --shadow di CSS: soft, menyebar, gak tajem
-  static List<BoxShadow> soft = [
+  static List<BoxShadow> sm = [
     BoxShadow(
-      color: const Color(0xFF1D3269).withValues(alpha: .08),
-      blurRadius: 35,
-      offset: const Offset(0, 12),
+      color: const Color(0xFF1A1F2E).withValues(alpha: .06),
+      blurRadius: 3,
+      offset: const Offset(0, 1),
     ),
     BoxShadow(
-      color: const Color(0xFF1D3269).withValues(alpha: .04),
-      blurRadius: 5,
-      offset: const Offset(0, 2),
+      color: const Color(0xFF1A1F2E).withValues(alpha: .04),
+      blurRadius: 2,
+      offset: const Offset(0, 1),
+    ),
+  ];
+
+  static List<BoxShadow> lg = [
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: .18),
+      blurRadius: 24,
+      offset: const Offset(0, -6),
     ),
   ];
 }
 
-/// Space Grotesk buat heading/brand (sama kaya h1, .login-brand span di web),
-/// Inter buat body text (default font web), IBM Plex Mono buat angka
-/// (qty, dll -- kalau nanti dibutuhin).
+/// Typography token: Chivo (display/headline), Outfit (title/body/label),
+/// JetBrains Mono (kode/angka).
 class AppText {
-  static TextStyle heading({double size = 22, Color? color, FontWeight w = FontWeight.w700}) =>
-      GoogleFonts.spaceGrotesk(fontWeight: w, fontSize: size, letterSpacing: -0.5, color: color ?? AppColors.ink);
+  static TextStyle displayMobile({Color? color}) => GoogleFonts.chivo(
+    fontSize: 28,
+    height: 34 / 28,
+    letterSpacing: -0.25,
+    fontWeight: FontWeight.w700,
+    color: color ?? AppColors.onSurface,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
 
-  static TextStyle body({double size = 14, FontWeight weight = FontWeight.w400, Color? color}) =>
-      GoogleFonts.inter(fontWeight: weight, fontSize: size, color: color ?? AppColors.ink);
+  static TextStyle headlineLg({Color? color}) => GoogleFonts.chivo(
+    fontSize: 24,
+    height: 30 / 24,
+    letterSpacing: -0.25,
+    fontWeight: FontWeight.w700,
+    color: color ?? AppColors.onSurface,
+  );
 
-  static TextStyle mono({double size = 16, FontWeight weight = FontWeight.w600, Color? color}) =>
-      GoogleFonts.ibmPlexMono(fontWeight: weight, fontSize: size, color: color ?? AppColors.primary);
+  static TextStyle headlineMd({Color? color}) => GoogleFonts.chivo(
+    fontSize: 20,
+    height: 26 / 20,
+    fontWeight: FontWeight.w700,
+    color: color ?? AppColors.onSurface,
+  );
+
+  static TextStyle titleMd({Color? color}) => GoogleFonts.outfit(
+    fontSize: 16,
+    height: 22 / 16,
+    fontWeight: FontWeight.w600,
+    color: color ?? AppColors.onSurface,
+  );
+
+  static TextStyle bodyMd({Color? color}) => GoogleFonts.outfit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w400,
+    color: color ?? AppColors.onSurface,
+  );
+
+  static TextStyle bodySm({Color? color}) => GoogleFonts.outfit(
+    fontSize: 12,
+    height: 16 / 12,
+    letterSpacing: 0.1,
+    fontWeight: FontWeight.w400,
+    color: color ?? AppColors.onSurfaceVariant,
+  );
+
+  static TextStyle labelLg({Color? color}) => GoogleFonts.outfit(
+    fontSize: 14,
+    height: 20 / 14,
+    letterSpacing: 0.1,
+    fontWeight: FontWeight.w600,
+    color: color ?? AppColors.onSurface,
+  );
+
+  static TextStyle labelSm({Color? color}) => GoogleFonts.outfit(
+    fontSize: 11,
+    height: 16 / 11,
+    letterSpacing: 0.4,
+    fontWeight: FontWeight.w600,
+    color: color ?? AppColors.onSurfaceVariant,
+  );
+
+  static TextStyle monoMd({Color? color}) => GoogleFonts.jetBrainsMono(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w600,
+    color: color ?? AppColors.onSurface,
+  );
+
+  static TextStyle monoSm({Color? color}) => GoogleFonts.jetBrainsMono(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.w500,
+    color: color ?? AppColors.onSurfaceVariant,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
 }
 
-/// ThemeData global -- dipasang sekali di MaterialApp (main.dart), jadi
-/// semua Scaffold/AppBar/Button di app otomatis kepake tanpa perlu di-style
-/// manual satu-satu di tiap halaman.
+/// Format tanggal Indonesia tanpa perlu package intl.
+class AppDate {
+  static const _bulan = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+
+  static DateTime? parse(dynamic raw) =>
+      raw == null ? null : DateTime.tryParse(raw.toString())?.toLocal();
+
+  static String tanggal(DateTime d) =>
+      '${d.day} ${_bulan[d.month - 1]} ${d.year}';
+
+  static String jam(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+}
+
 ThemeData buildAppTheme() {
   final base = ThemeData(useMaterial3: true);
+  final inputBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(AppRadius.md),
+    borderSide: const BorderSide(color: AppColors.outlineVariant),
+  );
   return base.copyWith(
-    scaffoldBackgroundColor: AppColors.surface0,
+    scaffoldBackgroundColor: AppColors.surface,
     colorScheme: base.colorScheme.copyWith(
       primary: AppColors.primary,
-      secondary: AppColors.primaryDeep,
-      error: AppColors.danger,
-      surface: AppColors.surface1,
+      onPrimary: AppColors.onPrimary,
+      primaryContainer: AppColors.primaryContainer,
+      onPrimaryContainer: AppColors.onPrimaryContainer,
+      secondary: AppColors.secondary,
+      onSecondary: AppColors.onSecondary,
+      secondaryContainer: AppColors.secondaryContainer,
+      onSecondaryContainer: AppColors.onSecondaryContainer,
+      error: AppColors.error,
+      errorContainer: AppColors.errorContainer,
+      onErrorContainer: AppColors.onErrorContainer,
+      surface: AppColors.surface,
+      onSurface: AppColors.onSurface,
+      onSurfaceVariant: AppColors.onSurfaceVariant,
+      outline: AppColors.outline,
+      outlineVariant: AppColors.outlineVariant,
+      surfaceContainerLowest: AppColors.surfaceContainerLowest,
+      surfaceContainerLow: AppColors.surfaceContainerLow,
+      surfaceContainer: AppColors.surfaceContainer,
+      surfaceContainerHigh: AppColors.surfaceContainerHigh,
+      surfaceContainerHighest: AppColors.surfaceContainerHighest,
     ),
-    textTheme: GoogleFonts.interTextTheme(base.textTheme).apply(
-      bodyColor: AppColors.ink,
-      displayColor: AppColors.ink,
+    // GoogleFonts.outfitTextTheme() balikin TextTheme versi flutter/material,
+    // beda tipe sama material_ui -- jadi cukup set fontFamily-nya aja.
+    textTheme: base.textTheme.apply(
+      fontFamily: GoogleFonts.outfit().fontFamily,
+      bodyColor: AppColors.onSurface,
+      displayColor: AppColors.onSurface,
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: AppColors.surface1,
-      foregroundColor: AppColors.ink,
+      backgroundColor: AppColors.surface,
+      foregroundColor: AppColors.onSurface,
       elevation: 0,
-      centerTitle: true,
+      centerTitle: false,
       surfaceTintColor: Colors.transparent,
-      titleTextStyle: AppText.heading(size: 18),
+      titleTextStyle: AppText.titleMd(),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFFF8FAFF),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm + 1),
-        borderSide: const BorderSide(color: AppColors.border),
+      fillColor: AppColors.surfaceContainerLowest,
+      constraints: const BoxConstraints(minHeight: 48),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintStyle: AppText.monoMd(color: AppColors.outline),
+      border: inputBorder,
+      enabledBorder: inputBorder,
+      focusedBorder: inputBorder.copyWith(
+        borderSide: const BorderSide(color: AppColors.primary, width: 2),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm + 1),
-        borderSide: const BorderSide(color: Color(0xFFDCE4F0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm + 1),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
-      ),
-      labelStyle: AppText.body(size: 12.5, weight: FontWeight.w600, color: AppColors.muted),
+      labelStyle: AppText.labelLg(color: AppColors.onSurfaceVariant),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.onPrimary,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-        textStyle: AppText.body(size: 14.5, weight: FontWeight.w600),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm + 1)),
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+        textStyle: AppText.labelLg(),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.onSurfaceVariant,
+        textStyle: AppText.labelLg(),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+      ),
+      titleTextStyle: AppText.headlineMd(),
+      contentTextStyle: AppText.bodyMd(color: AppColors.onSurfaceVariant),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: const Color(0xFF2A3142),
+      contentTextStyle: AppText.bodyMd(color: const Color(0xFFEEF1F7)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
     ),
     cardTheme: CardThemeData(
-      color: AppColors.surface1,
+      color: AppColors.surfaceContainerLowest,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: const BorderSide(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
     ),
   );

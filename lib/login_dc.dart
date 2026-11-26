@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:abwarehouse/app_theme.dart';
+import 'package:abwarehouse/ui_kit.dart';
 
 class LoginDcPage extends StatefulWidget {
   const LoginDcPage({super.key});
@@ -29,204 +30,216 @@ class _LoginDcPageState extends State<LoginDcPage> {
     return '$trimmed@$_emailDomain';
   }
 
-Future<void> doLogin() async {
-  setState(() {
-    loading = true;
-    error = null;
-  });
+  Future<void> doLogin() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
 
-  try {
-    final auth = await supabase.auth.signInWithPassword(
-      email: _buildEmail(usernameCtrl.text),
-      password: passCtrl.text,
-    );
+    try {
+      final auth = await supabase.auth.signInWithPassword(
+        email: _buildEmail(usernameCtrl.text),
+        password: passCtrl.text,
+      );
 
-    final uid = auth.user?.id;
-    if (uid == null) {
-      throw const AuthException('Login gagal. Coba lagi.');
-    }
-
-    final profile = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', uid)
-        .maybeSingle();
-
-    // Aplikasi HP hanya untuk scanner.
-    if (profile == null || profile['role'] != 'scanner') {
-      await supabase.auth.signOut();
-
-      if (mounted) {
-        setState(() {
-          error = 'Akun ini khusus untuk web. '
-              'Silakan login memakai akun scanner.';
-        });
+      final uid = auth.user?.id;
+      if (uid == null) {
+        throw const AuthException('Login gagal. Coba lagi.');
       }
-      return;
-    }
 
-    // AuthGate otomatis membuka HomePage setelah login berhasil.
-  } on AuthException catch (e) {
-    if (mounted) setState(() => error = e.message);
-  } catch (e) {
-    if (mounted) setState(() => error = 'Gagal login: $e');
-  } finally {
-    if (mounted) setState(() => loading = false);
+      final profile = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', uid)
+          .maybeSingle();
+
+      // Aplikasi HP hanya untuk scanner.
+      if (profile == null || profile['role'] != 'scanner') {
+        await supabase.auth.signOut();
+
+        if (mounted) {
+          setState(() {
+            error =
+                'Akun ini khusus untuk web. '
+                'Silakan login memakai akun scanner.';
+          });
+        }
+        return;
+      }
+
+      // AuthGate otomatis membuka HomePage setelah login berhasil.
+    } on AuthException catch (e) {
+      if (mounted) setState(() => error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => error = 'Gagal login: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
-}
+
+  @override
+  void dispose() {
+    usernameCtrl.dispose();
+    passCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Gak pake AppBar -- di web, loginScreen juga full-bleed tanpa topbar,
-    // langsung gradient background + card di tengah.
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(gradient: AppColors.loginGradient),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.md,
+                  vertical: AppSpace.xl,
+                ),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: _loginCard(),
+                  constraints: BoxConstraints(
+                    minHeight: (constraints.maxHeight - AppSpace.xl * 2).clamp(
+                      0.0,
+                      double.infinity,
+                    ),
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _header(),
+                        const Spacer(),
+                        const SizedBox(height: AppSpace.lg),
+                        _form(),
+                        const SizedBox(height: AppSpace.lg),
+                        const Spacer(),
+                        Text(
+                          'Kendala akses? Hubungi Bang Amin Ganteng',
+                          textAlign: TextAlign.center,
+                          style: AppText.bodySm(),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _loginCard() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(30, 34, 30, 28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF040C2C).withValues(alpha: .34),
-            blurRadius: 60,
-            offset: const Offset(0, 22),
+  Widget _header() => Padding(
+    padding: const EdgeInsets.only(top: AppSpace.sm),
+    child: Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            boxShadow: AppShadow.sm,
           ),
-        ],
+          child: const Icon(
+            Icons.qr_code_scanner,
+            size: 24,
+            color: AppColors.onPrimary,
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ScanKuy', style: AppText.titleMd()),
+              Text('Operasional DC', style: AppText.bodySm()),
+            ],
+          ),
+        ),
+        const StatusPill(),
+      ],
+    ),
+  );
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: AppSpace.xs),
+    child: Text(text, style: AppText.labelLg()),
+  );
+
+  Widget _form() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text('Halo Cuy!', style: AppText.headlineLg()),
+      const SizedBox(height: AppSpace.xs),
+      Text(
+        'Kuy masuk, input dulu username dan password-nya yak!',
+        style: AppText.bodyMd(color: AppColors.onSurfaceVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Logo perusahaan tetep dipertahanin, cuma dikecilin -- brand
-          // "ABwarehouse" + subjudul "Scanner" yang jadi fokus utama,
-          // ngikutin pola .login-brand + p.sub di web (icon + judul + sub).
-          Center(
-            child: Image.asset(
-              'assets/images/logo_ABI.png',
-              height: 72,
+      const SizedBox(height: AppSpace.lg),
+      _label('Username'),
+      TextField(
+        controller: usernameCtrl,
+        keyboardType: TextInputType.text,
+        textInputAction: TextInputAction.next,
+        autofillHints: const [AutofillHints.username],
+        style: AppText.monoMd(),
+        decoration: const InputDecoration(hintText: 'Contoh : scannerganteng1'),
+      ),
+      const SizedBox(height: AppSpace.md),
+      _label('Password'),
+      TextField(
+        controller: passCtrl,
+        obscureText: obscurePassword,
+        autofillHints: const [AutofillHints.password],
+        style: AppText.monoMd(),
+        onSubmitted: (_) => loading ? null : doLogin(),
+        decoration: InputDecoration(
+          hintText: 'Masukkan password',
+          suffixIcon: IconButton(
+            tooltip: obscurePassword
+                ? 'Tampilkan password'
+                : 'Sembunyikan password',
+            icon: Icon(
+              obscurePassword ? Icons.visibility : Icons.visibility_off,
+              color: AppColors.onSurfaceVariant,
+              size: 20,
             ),
+            onPressed: () => setState(() => obscurePassword = !obscurePassword),
           ),
-          const SizedBox(height: 18),
-          Text(
-            "ABWarehouse",
-            textAlign: TextAlign.center,
-            style: AppText.heading(size: 24),
+        ),
+      ),
+      if (error != null) ...[
+        const SizedBox(height: AppSpace.md),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.errorContainer,
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          const SizedBox(height: 4),
-          Text(
-            "Scanner",
-            textAlign: TextAlign.center,
-            style: AppText.body(size: 13.5, weight: FontWeight.w500, color: AppColors.muted),
-          ),
-          const SizedBox(height: 28),
-          if (error != null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-              decoration: BoxDecoration(
-                color: AppColors.dangerSoft,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error,
+                size: 18,
+                color: AppColors.onErrorContainer,
               ),
-              child: Text(
-                error!,
-                style: AppText.body(size: 13, color: AppColors.danger),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          Text("Username", style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.muted)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: usernameCtrl,
-            keyboardType: TextInputType.text,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(hintText: "...."),
-          ),
-          const SizedBox(height: 16),
-          Text("Password", style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.muted)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: passCtrl,
-            obscureText: obscurePassword,
-            onSubmitted: (_) => loading ? null : doLogin(),
-            decoration: InputDecoration(
-              hintText: "....",
-              suffixIcon: IconButton(
-                icon: Icon(
-                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: AppColors.muted,
-                  size: 20,
-                ),
-                onPressed: () => setState(() => obscurePassword = !obscurePassword),
-              ),
-            ),
-          ),
-          const SizedBox(height: 22),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(AppRadius.sm + 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: .28),
-                    blurRadius: 18,
-                    offset: const Offset(0, 9),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadius.sm + 1),
-                  onTap: loading ? null : doLogin,
-                  child: Center(
-                    child: loading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(
-                            "Masuk",
-                            style: AppText.body(size: 14.5, weight: FontWeight.w700, color: Colors.white),
-                          ),
-                  ),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Text(
+                  error!,
+                  style: AppText.bodySm(color: AppColors.onErrorContainer),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+      const SizedBox(height: AppSpace.md + AppSpace.xs),
+      AppButton(label: 'Masuk Shift', loading: loading, onPressed: doLogin),
+    ],
+  );
 }

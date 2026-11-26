@@ -23,6 +23,7 @@ dependencies:
   supabase_flutter: ^2.8.0
   google_fonts: ^6.2.1
 
+  material_ui: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -35,6 +36,7 @@ flutter:
 
   assets:
     - assets/kagetshort.mp3
+    - assets/jokowi-kaget.mp3
     - assets/images/logo_ABI.png
     - assets/icon/logo_ABI.png
 
