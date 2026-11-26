@@ -214,15 +214,22 @@ class _ScannerState extends State<Scanner> {
         sectorOptions = List<Map<String, dynamic>>.from(psData).map((ps) {
           final sector = ps['sectors'] as Map<String, dynamic>?;
           final zone = sector?['zones'] as Map<String, dynamic>?;
+          String? clean(dynamic v) {
+            final t = v?.toString().trim() ?? '';
+            return t.isEmpty ? null : t;
+          }
+
+          final zonaNama = clean(zone?['nama']);
+          // Format: "Zona I - I001" (I001 = nama sector).
           final parts = [
-            zone?['nama'],
-            sector?['nama'],
-          ].where((e) => e != null && e.toString().trim().isNotEmpty).toList();
+            if (zonaNama != null) 'Zona $zonaNama',
+            ?clean(sector?['nama']),
+          ];
           return <String, dynamic>{
             'sectorId': ps['sector_id'].toString(),
             'label': parts.isEmpty
                 ? (ps['sector_id']?.toString() ?? '-')
-                : parts.join(' · '),
+                : parts.join(' - '),
           };
         }).toList();
         online = true;
@@ -340,7 +347,7 @@ class _ScannerState extends State<Scanner> {
         context,
         title: "Sector Ini Udah Ada Entry-nya",
         message:
-            "Sector $sectorLabel buat produk ini udah ada entry lain "
+            "Lokasi $sectorLabel buat produk ini udah ada entry lain "
             "(qty ${scannedItems[newKey]!['qty']}). Timpa dengan qty $qty?",
         confirmLabel: "Timpa",
       );
@@ -373,7 +380,7 @@ class _ScannerState extends State<Scanner> {
       context,
       title: "Hapus Item",
       message:
-          "Hapus \"${product['nama'] ?? current['barcode']}\" (sector $sectorLabel) dari list scan ini?",
+          "Hapus \"${product['nama'] ?? current['barcode']}\" ($sectorLabel) dari list scan ini?",
       confirmLabel: "Hapus",
       destructive: true,
     );
@@ -1178,7 +1185,7 @@ class _ScannerState extends State<Scanner> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'Sector ${last['sectorLabel']}',
+                        '${last['sectorLabel']}',
                         style: AppText.monoSm(),
                       ),
                     ],
@@ -1595,7 +1602,7 @@ class _SummaryPageState extends State<_SummaryPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${item['barcode']} · Sector ${item['sectorLabel']}',
+                      '${item['barcode']} · ${item['sectorLabel']}',
                       style: AppText.monoSm(),
                     ),
                     Text(
@@ -1675,7 +1682,7 @@ class _SummaryPageState extends State<_SummaryPage> {
                     style: AppText.titleMd(),
                   ),
                   Text(
-                    'Sector ${item['sectorLabel']} · ${item['barcode']}',
+                    '${item['sectorLabel']} · ${item['barcode']}',
                     style: AppText.bodySm(),
                   ),
                 ],
